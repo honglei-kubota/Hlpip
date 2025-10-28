@@ -23,6 +23,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica N
 .btn-danger{background:#fa5252;color:#fff;}
 form input,form textarea{width:100%;padding:8px;margin:6px 0 12px;border:1px solid #ccc;border-radius:4px;}
 form textarea{resize:vertical;min-height:120px;}
+.btn-primary, .btn-warning, .btn-danger {
+    display: inline-block;
+    width: 52px;          /* 统一宽度 */
+    height: 28px;         /* 统一高度 */
+    line-height: 28px;    /* 文字垂直居中 */
+    text-align: center;   /* 文字水平居中 */
+    font-size: 14px;      /* 字号一致 */
+    padding: 0;           /* 去掉默认内边距 */
+    border: none;         /* 去掉边框差异 */
+}
 </style>
 '''
 
