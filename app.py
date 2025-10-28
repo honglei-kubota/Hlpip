@@ -43,7 +43,7 @@ def home():
     </div>
     <div class="container">
         <div class="card">
-            <h3>🎯 使用提示</h3>
+            <h3>🎯 使用提示-hlhlhl</h3>
             <p>点击“笔记列表”可查看、编辑、删除已有笔记；点击“+ 新建笔记”可创建。</p>
         </div>
     </div>
