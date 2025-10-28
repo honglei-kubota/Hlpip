@@ -2,14 +2,8 @@ from flask import Flask, render_template_string, request, redirect, url_for, abo
 import time
 
 app = Flask(__name__)
-
-# 内存数据库：id 自增
-NOTES = {
-    1: {"title": "测试笔记1", "content": "这是第一条测试数据"},
-    2: {"title": "测试笔记2", "content": "这是第二条测试数据"},
-}
-_next_id = 3
-
+import os
+from database import *          # ← 改这里：引入 SQLite 工具
 # ===== 通用 CSS =====
 BASE_CSS = '''
 <style>
@@ -52,62 +46,39 @@ def home():
 # ===== 列表页 =====
 @app.route('/notes')
 def notes():
+    notes = all_notes()          # ← 改这里：SQLite 查询
     return render_template_string(BASE_CSS + '''
-    <div class="header">
-        <h1>📚 笔记列表</h1>
-        <a href="/">首页</a>
-        <a href="/notes/new">+ 新建笔记</a>
-    </div>
-    <div class="container">
-        {% for id, note in notes.items() %}
-        <div class="card">
-            <h3>{{ note.title }}</h3>
-            <p>{{ note.content[:80] }}…</p>
-            <div>
-                <a class="btn-primary" href="/notes/{{ id }}">查看</a>
-                <a class="btn-warning" href="/notes/{{ id }}/edit">编辑</a>
-                <a class="btn-danger" href="/notes/{{ id }}/delete">删除</a>
+            <div class="header">
+                <h1>📚 笔记列表</h1>
+                <a href="/">首页</a>
+                <a href="/notes/new">+ 新建笔记</a>
             </div>
-        </div>
-        {% endfor %}
-    </div>
-    ''', notes=NOTES)
-
-# ===== 创建 =====
-@app.route('/notes/new', methods=['GET', 'POST'])
-def new_note():
-    if request.method == 'POST':
-        global _next_id
-        title = request.form.get('title', '').strip()
-        content = request.form.get('content', '').strip()
-        if not title or not content:
-            return "标题和内容不能为空！", 400
-        NOTES[_next_id] = {"title": title, "content": content}
-        _next_id += 1
-        return redirect(url_for('notes'))
-    # GET
-    return render_template_string(BASE_CSS + '''
-    <div class="header"><h1>✍️ 新建笔记</h1><a href="/notes">返回列表</a></div>
-    <div class="container">
-        <form method="post">
-            <label>标题</label><input name="title" placeholder="请输入标题">
-            <label>内容</label><textarea name="content" placeholder="请输入内容"></textarea>
-            <button type="submit" class="btn-primary">保存</button>
-        </form>
-    </div>
-    ''')
+            <div class="container">
+                {% for note in notes %}                      {# ← 这里改 #}
+                <div class="card">
+                    <h3>{{ note.title }}</h3>
+                    <p>{{ note.content[:80] }}…</p>
+                    <div>
+                        <a class="btn-primary" href="/notes/{{ note.id }}">查看</a>
+                        <a class="btn-warning" href="/notes/{{ note.id }}/edit">编辑</a>
+                        <a class="btn-danger" href="/notes/{{ note.id }}/delete">删除</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            ''', notes=notes)
 
 # ===== 查看单条 =====
 @app.route('/notes/<int:note_id>')
 def note_detail(note_id):
-    note = NOTES.get(note_id)
+    note = get_note(note_id)          # ← 改这里：SQLite 单条查询
     if not note:
         abort(404)
-    return render_template_string(BASE_CSS + '''
+    return render_template_string('''
     <div class="header">
         <h1>{{ note.title }}</h1>
         <a href="/notes">返回列表</a>
-        <a href="/notes/{{ note_id }}/edit">编辑</a>
+        <a href="/notes/{{ note.id }}/edit">编辑</a>
     </div>
     <div class="container">
         <div class="card">
@@ -115,40 +86,58 @@ def note_detail(note_id):
             <small>创建/编辑时间：{{ ts }}</small>
         </div>
     </div>
-    ''', note=note, note_id=note_id, ts=time.strftime("%Y-%m-%d %H:%M:%S"))
+    ''', note=note, ts=time.strftime("%Y-%m-%d %H:%M:%S"))
 
-# ===== 编辑 =====
-@app.route('/notes/<int:note_id>/edit', methods=['GET', 'POST'])
-def edit_note(note_id):
-    note = NOTES.get(note_id)
-    if not note:
-        abort(404)
+# ===== 创建 =====
+@app.route('/notes/new', methods=['GET', 'POST'])
+def new_note():
     if request.method == 'POST':
         title = request.form.get('title', '').strip()
         content = request.form.get('content', '').strip()
         if not title or not content:
             return "标题和内容不能为空！", 400
-        note['title'] = title
-        note['content'] = content
-        return redirect(url_for('note_detail', note_id=note_id))
-    # GET
+        add_note(title, content)          # ← 改这里：SQLite 插入
+        return redirect(url_for('notes'))
     return render_template_string(BASE_CSS + '''
-    <div class="header"><h1>✏️ 编辑笔记</h1><a href="/notes">返回列表</a></div>
-    <div class="container">
-        <form method="post">
-            <label>标题</label><input name="title" value="{{ note.title }}">
-            <label>内容</label><textarea name="content">{{ note.content }}</textarea>
-            <button type="submit" class="btn-primary">保存修改</button>
-        </form>
-    </div>
-    ''', note=note)
+        <div class="header"><h1>✍️ 新建笔记</h1><a href="/notes">返回列表</a></div>
+        <div class="container">
+            <form method="post">
+                <label>标题</label><input name="title" placeholder="请输入标题">
+                <label>内容</label><textarea name="content" placeholder="请输入内容"></textarea>
+                <button type="submit" class="btn-primary">保存</button>
+            </form>
+        </div>
+        ''')
+
+# ===== 编辑 =====
+@app.route('/notes/<int:note_id>/edit', methods=['GET', 'POST'])
+def edit_note(note_id):
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        content = request.form.get('content', '').strip()
+        if not title or not content:
+            return "标题和内容不能为空！", 400
+        upd_note(note_id, title, content)          # ← 改这里：SQLite 更新
+        return redirect(url_for('note_detail', note_id=note_id))
+    note = get_note(note_id)                       # ← 改这里：SQLite 读取
+    if not note:
+        abort(404)
+    return render_template_string(BASE_CSS + '''
+        <div class="header"><h1>✏️ 编辑笔记</h1><a href="/notes">返回列表</a></div>
+        <div class="container">
+            <form method="post">
+                <label>标题</label><input name="title" value="{{ note.title }}">
+                <label>内容</label><textarea name="content">{{ note.content }}</textarea>
+                <button type="submit" class="btn-primary">保存修改</button>
+            </form>
+        </div>
+        ''', note=note)
 
 # ===== 删除 =====
 @app.route('/notes/<int:note_id>/delete')
 def delete_note(note_id):
-    if note_id in NOTES:
-        del NOTES[note_id]
-    return redirect(url_for('notes'))
+    del_note(note_id)          # ← 改这里：SQLite 删除
 
+    return redirect(url_for('notes'))
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000, debug=True)
